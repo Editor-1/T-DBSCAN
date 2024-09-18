@@ -1,4 +1,4 @@
-import calculateDistance from './pubMethods'
+import {calculateDistance} from './pubMethods'
 export function clarans(data, k, numLocal, maxNeighbor) {
     // 计算聚类结果的总成本
     function calculateTotalCost(data, medoids) {

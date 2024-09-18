@@ -1,4 +1,4 @@
-import calculateDistance from './pubMethods'
+import {calculateDistance} from './pubMethods'
 
 export function dbscan(data, eps, minPts) {
     // 查找邻域的辅助函数

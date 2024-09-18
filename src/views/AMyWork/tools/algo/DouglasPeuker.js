@@ -1,4 +1,4 @@
-import calculateDistance from './pubMethods'
+import {calculateDistance} from './pubMethods'
 
 // 计算垂距
 function distToSegment(start, end, center) {
@@ -46,7 +46,6 @@ export function douglasPeucker(coordinates, dMax) {
     if (!coordinates || !(coordinates.length > 2)) {
         return null;
     }
-
     // 将输入数据转换为包含 lat 和 lng 的对象
     let coordinate = coordinates.map((item, index) => ({
         lat: item.lat,

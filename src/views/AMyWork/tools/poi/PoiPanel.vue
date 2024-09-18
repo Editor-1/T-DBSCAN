@@ -220,7 +220,8 @@ import { kMeans } from '../algo/kmeans'
 import { clarans } from '../algo/clarans' 
 import { dbscan } from '../algo/dbscan' 
 import { optics } from '../algo/optics' 
-import {ElePoint, convertDateStringToUnix} from '../algo/pubMethods'
+import {ElePoint, Region, QuadTreeNode} from '../algo/pubMethods'
+import {convertDateStringToUnix,insertEle,queryEle} from '../algo/pubMethods'
 import { tdbscan } from '../algo/tdbscan' 
 import * as PathLayer from '../comm/PathLayer'
 const pointerImg = require('@/assets/images/location64.png')
@@ -331,8 +332,6 @@ export default {
     clusterStyle(newVal) {  
       if (newVal) { // 确保有值被选中  
         this.pattern = 3 // 设置为聚合  
-        // 如果需要，可以在这里添加逻辑来禁用或隐藏其他选项，但Element UI的el-radio不支持直接禁用  
-        // 一种方法是使用额外的数据属性来控制显示  
       }else{
         this.pattern = 2
       }  
@@ -424,7 +423,7 @@ export default {
             if (this.isValidLatLng(item)) {
               const marker = this.createMarker(item, icon);
               markersCanvas.addMarker(marker);
-              latlngs.push([item.lng, item.lat]);
+              latlngs.push([item.lat, item.lng]);
             }
           });
           this.handleGeometricType(latlngs, markersCanvas);
@@ -437,7 +436,7 @@ export default {
             if (this.isValidLatLng(item)) {
               const marker = this.createMarker(item, icon);
               markersCanvas.addMarker(marker);
-              latlngs.push([item.lng, item.lat]);
+              latlngs.push([item.lat, item.lng]);
             }
           });
           this.handleGeometricType(latlngs, markersCanvas);
@@ -447,23 +446,29 @@ export default {
 
     // 聚类后的展示逻辑
     displayWithClustering(temp_bird_data, markersCanvas, icon) {
-      if(this.geometricType == 5){
-        
-      }
       temp_bird_data.then(birdArr => {
         let clusterCenters = [];
+        let latlngs = [];
+        // 建立四叉树索引方便后续的查询操作
+        const rootRegion = new Region(-90, 90, -180, 180);
+        const root = new QuadTreeNode(1, rootRegion);
+        var points = birdArr
+        points.forEach((p, index) => {
+            p.index = index;
+            insertEle(root, p);
+        });
         switch(this.clusterStyle) {
           case 1:
-            clusterCenters = clarans(birdArr, 20, 5, 100);
+            clusterCenters = clarans(points, 20, 5, 100);
             break;
           case 2:
-            clusterCenters = kMeans(birdArr, 20);
+            clusterCenters = kMeans(points, 20);
             break;
           case 3:
-            clusterCenters = dbscan(birdArr, 25, 70);
+            clusterCenters = dbscan(points, 25, 70);
             break;
           case 4:
-            clusterCenters =  optics(birdArr,25,70);
+            clusterCenters =  optics(points,25,70);
             break;
           case 5:
             if(this.maxstayTime == ''){
@@ -474,6 +479,7 @@ export default {
               const temp = new ElePoint(parseFloat(item.lat), parseFloat(item.lng), convertDateStringToUnix(item.time), gpsPoints.length);
               gpsPoints.push(temp);
             })
+            
             const {clusters,CorePoints} = tdbscan(gpsPoints,25000,60 * 60 * 24 * 3,60 * 60 * 24 * this.maxstayTime)
             for(const p of CorePoints){
                 var num = 0
@@ -489,25 +495,59 @@ export default {
             }
             break;
         }
-        let latlngs = [];
-        console.log('滤波算法前',clusterCenters)
-        clusterCenters = douglasPeucker(clusterCenters,25000)
-        console.log('滤波算法后',clusterCenters)
-        clusterCenters.forEach(item => {
-          if (this.isValidLatLng(item)) {
-            const marker = this.createCenterMarker(item, icon);
+        // 计算停歇时间 做分级渲染
+        clusterCenters = douglasPeucker(clusterCenters,10000)
+        clusterCenters.forEach(item =>{
+          const point  = new ElePoint(item.lat,item.lng,convertDateStringToUnix(item.time),item.index)
+          const EpsResults = []
+          queryEle(root,point,EpsResults,25000)
+          const centerPoint = this.getCenterPoint(EpsResults)
+          const times = EpsResults.map(point => convertDateStringToUnix(point.time))
+          const startTime = new Date(Math.min(...times) * 1000).toUTCString()
+          const endTime = new Date(Math.max(...times) * 1000).toUTCString()
+          const maxstayTime = (Math.max(...times) - Math.min(...times))/(60*60*24)
+          if(this.isValidLatLng(centerPoint)){
+            const marker = this.createCenterMarker({centerPoint,maxstayTime,startTime,endTime}, icon);
             markersCanvas.addMarker(marker);
-            latlngs.push([item.lng, item.lat]);
+            latlngs.push([centerPoint.lat, centerPoint.lng]);
           }
-        });
+        })
         this.handleGeometricType(latlngs, markersCanvas);
-
       });
+    },
+    // 球面平均 
+    getCenterPoint(points){
+      var point_num = points.length; //坐标点个数
+      var X = 0, Y = 0, Z = 0;
+      for(let i = 0; i< points.length; i++) {
+        if (points[i] == '') {
+          continue;
+        }
+        let point = points[i];
+        var lat, lng, x, y, z;
+        lat = parseFloat(point.lat) * Math.PI / 180;
+        lng = parseFloat(point.lng) * Math.PI / 180;
+        x = Math.cos(lat) * Math.cos(lng);
+        y = Math.cos(lat) * Math.sin(lng);
+        z = Math.sin(lat);
+        X += x;
+        Y += y;
+        Z += z;
+      }
+      X = X / point_num;
+      Y = Y / point_num;
+      Z = Z / point_num;
+      var tmp_lng = Math.atan2(Y, X);
+      var tmp_lat = Math.atan2(Z, Math.sqrt(X * X + Y * Y));
+      return {lat:tmp_lat * 180 / Math.PI, lng:tmp_lng * 180 / Math.PI};
     },
     // 创建栖息地点位，时间越长，icon的size将会随着调整
     createCenterMarker(item,icon){
-       return L.marker([item.lng, item.lat], { icon })
-        .bindPopup(`停留时间:${(parseFloat(item.time)/(60 * 60 * 24)).toFixed(2)}天<p>经度:${parseFloat(item.lat).toFixed(5)}<p>纬度:${parseFloat(item.lng).toFixed(5)}`)
+       return L.marker([item.centerPoint.lat, item.centerPoint.lng], { icon })
+        .bindPopup(`停留时间:${item.maxstayTime.toFixed(2)}天<p>
+          开始时间:${item.startTime}<p>
+          结束时间:${item.endTime}<p>
+          经度:${parseFloat(item.centerPoint.lng).toFixed(5)}<p>纬度:${parseFloat(item.centerPoint.lat).toFixed(5)}`)
         .on({
           mouseover(e) { this.openPopup(); },
           mouseout(e) { this.closePopup(); }
@@ -515,8 +555,8 @@ export default {
     },
     // 创建普通点标记
     createMarker(item, icon) {
-      return L.marker([item.lng, item.lat], { icon })
-        .bindPopup(`时间:${item.time}<p>经度:${item.lat.toFixed(5)}<p>纬度:${item.lng.toFixed(5)}`)
+      return L.marker([item.lat, item.lng], { icon })
+        .bindPopup(`时间:${item.time}<p>经度:${parseFloat(item.lng).toFixed(5)}<p>纬度:${parseFloat(item.lat).toFixed(5)}`)
         .on({
           mouseover(e) { this.openPopup(); },
           mouseout(e) { this.closePopup(); }
@@ -524,8 +564,20 @@ export default {
     },
 
     // 判断纬度和经度是否合法
-    isValidLatLng(item) {
-      return item.lat != null && item.lng != null && item.lat !== 0 && item.lng !== 0;
+    isValidLatLng(item) {  
+      // 检查纬度和经度是否存在且不为null  
+      if (item.lat == null || item.lng == null) {  
+        return false;  
+      }  
+      // 检查纬度和经度是否在有效范围内  
+      // 将字符串转化为浮点数
+      const lat = parseFloat(item.lat)
+      const lng = parseFloat(item.lng)
+      
+      const isValidLat = Number.isFinite(lat) && lat >= -90 &&  lat <= 90;  
+      const isValidLng = Number.isFinite(lng) && lng >= -180 && lng <= 180;  
+      // 返回纬度和经度是否都有效的结果  
+      return isValidLat && isValidLng;  
     },
 
     // 根据几何类型绘制
@@ -549,19 +601,33 @@ export default {
       }
     },
     // 读取csv文件
-    async loadCSV(data) {  
-      const csvUrl = `../resource/${data}.csv`;  
-      try {  
-        const response = await fetch(csvUrl);  
-        if (!response.ok) throw new Error('Network response was not ok');  
-        const csv = await response.text();  
-        const results = Papa.parse(csv, { header: true }); 
-        // this.cludata = results.data; // 将解析后的数据赋值给datalist  
-        return results.data
-      } catch (error) {  
-        console.error('Error loading CSV:', error);  
-        // 可以在这里处理错误，比如显示一个错误消息给用户  
-      }  
+    async loadCSV(data) {    
+      const csvUrl = `../resource/${data}.csv`;    
+      try {    
+        const response = await fetch(csvUrl);    
+        if (!response.ok) throw new Error('Network response was not ok');    
+        const csv = await response.text();    
+        const results = Papa.parse(csv, {  
+          header: true,  
+          transform: function(value, field) {  
+            // 根据列名（field）来决定如何转换值  
+            if (field === 'lng' || field === 'lat') {  
+              // 尝试将值转换为浮点数，如果失败则返回原始值（或你可以决定如何处理错误）  
+              const num = parseFloat(value);  
+              return isNaN(num) ? value : num;  
+            }  
+            // 对于time列，我们保持其原始字符串形式  
+            return value;  
+          }  
+        });   
+        // 如果需要，可以在这里将解析后的数据赋值给某个属性，或者直接返回  
+        // this.cludata = results.data; // 假设cludata是你的组件的一个数据属性  
+        return results.data;  
+      } catch (error) {    
+        console.error('Error loading CSV:', error);    
+        // 可以在这里处理错误，比如通过抛出一个错误或显示一个错误消息给用户  
+        throw error; // 你可以选择重新抛出错误，以便在调用者中捕获和处理  
+      }    
     },
     //根据地名查找经纬度
     searchLngByName(options){

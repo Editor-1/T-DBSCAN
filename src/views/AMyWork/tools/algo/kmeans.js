@@ -1,4 +1,4 @@
-import calculateDistance from './pubMethods'
+import {calculateDistance,convertDateStringToUnix} from './pubMethods'
 export function kMeans(data, k) {
     // 随机初始化中心点的辅助函数
     function initializeCentroids(data, k) {
@@ -44,7 +44,11 @@ export function kMeans(data, k) {
             if (cluster.length === 0) return null;
             const sumLat = cluster.reduce((sum, point) => sum + parseFloat(point.lat), 0);
             const sumLng = cluster.reduce((sum, point) => sum + parseFloat(point.lng), 0);
-            return { lat: sumLat / cluster.length, lng: sumLng / cluster.length };
+            const times = cluster.map(point => convertDateStringToUnix(point.time));  
+            const minTime = Math.min(...times)*1000;
+            const date = new Date(minTime)
+            const dateStr = date.toISOString()
+            return { lat: sumLat / cluster.length, lng: sumLng / cluster.length, time: dateStr};
         }).filter(centroid => centroid !== null);
     }
 
@@ -61,6 +65,6 @@ export function kMeans(data, k) {
         centroids = newCentroids;
         iterations++;
     }
-
+    console.log(centroids)
     return centroids;
 }
