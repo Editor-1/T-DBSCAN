@@ -221,7 +221,8 @@ import { clarans } from '../algo/clarans'
 import { dbscan } from '../algo/dbscan' 
 import { optics } from '../algo/optics' 
 import {ElePoint, Region, QuadTreeNode} from '../algo/pubMethods'
-import {convertDateStringToUnix,insertEle,queryEle,convertUnixToDateString} from '../algo/pubMethods'
+import {convertDateStringToUnix,insertEle,queryEle,
+      convertUnixToDateString,getCenterPoint,isValidLatLng} from '../algo/pubMethods'
 import { tdbscan } from '../algo/tdbscan' 
 import * as PathLayer from '../comm/PathLayer'
 const pointerImg = require('@/assets/images/location64.png')
@@ -434,7 +435,7 @@ export default {
           let latlngs = [];
           birdArr = douglasPeucker(birdArr,25000)
           birdArr.forEach(item => {
-            if (this.isValidLatLng(item)) {
+            if (isValidLatLng(item)) {
               const marker = this.createMarker(item, icon);
               markersCanvas.addMarker(marker);
               markersList.push(marker);
@@ -448,7 +449,7 @@ export default {
         temp_bird_data.then(birdArr => {
           let latlngs = [];
           birdArr.forEach(item => {
-            if (this.isValidLatLng(item)) {
+            if (isValidLatLng(item)) {
               const marker = this.createMarker(item, icon);
               markersList.push(marker);
               markersCanvas.addMarker(marker);
@@ -517,15 +518,14 @@ export default {
           const point  = new ElePoint(item.lat,item.lng,convertDateStringToUnix(item.time),item.index)
           const EpsResults = []
           queryEle(root,point,EpsResults,25000)
-          const centerPoint = this.getCenterPoint(EpsResults)
+          const centerPoint = getCenterPoint(EpsResults)
           const times = EpsResults.map(point => convertDateStringToUnix(point.time))
           const startTime = new Date(Math.min(...times))
           const endTime = new Date(Math.max(...times))
           const startTimeStr = convertUnixToDateString(startTime)
           const endTimeStr = convertUnixToDateString(endTime)
-          
           const maxstayTime = (Math.max(...times) - Math.min(...times))/(60*60*24)
-          if(this.isValidLatLng(centerPoint)){
+          if(isValidLatLng(centerPoint)){
             const marker = this.createCenterMarker({centerPoint,maxstayTime,startTimeStr,endTimeStr}, icon);
             markersCanvas.addMarker(marker);
             previousLayers.push(marker)
@@ -535,32 +535,6 @@ export default {
         })
         this.handleGeometricType(latlngs, markersCanvas);
       });
-    },
-    // 球面平均 
-    getCenterPoint(points){
-      var point_num = points.length; //坐标点个数
-      var X = 0, Y = 0, Z = 0;
-      for(let i = 0; i< points.length; i++) {
-        if (points[i] == '') {
-          continue;
-        }
-        let point = points[i];
-        var lat, lng, x, y, z;
-        lat = parseFloat(point.lat) * Math.PI / 180;
-        lng = parseFloat(point.lng) * Math.PI / 180;
-        x = Math.cos(lat) * Math.cos(lng);
-        y = Math.cos(lat) * Math.sin(lng);
-        z = Math.sin(lat);
-        X += x;
-        Y += y;
-        Z += z;
-      }
-      X = X / point_num;
-      Y = Y / point_num;
-      Z = Z / point_num;
-      var tmp_lng = Math.atan2(Y, X);
-      var tmp_lat = Math.atan2(Z, Math.sqrt(X * X + Y * Y));
-      return {lat:tmp_lat * 180 / Math.PI, lng:tmp_lng * 180 / Math.PI};
     },
     // 创建栖息地点位，时间越长，icon的size将会随着调整
     createCenterMarker(item,icon){
@@ -582,23 +556,6 @@ export default {
           mouseover(e) { this.openPopup(); },
           mouseout(e) { this.closePopup(); }
         });
-    },
-
-    // 判断纬度和经度是否合法
-    isValidLatLng(item) {  
-      // 检查纬度和经度是否存在且不为null  
-      if (item.lat == null || item.lng == null) {  
-        return false;  
-      }  
-      // 检查纬度和经度是否在有效范围内  
-      // 将字符串转化为浮点数
-      const lat = parseFloat(item.lat)
-      const lng = parseFloat(item.lng)
-      
-      const isValidLat = Number.isFinite(lat) && lat >= -90 &&  lat <= 90;  
-      const isValidLng = Number.isFinite(lng) && lng >= -180 && lng <= 180;  
-      // 返回纬度和经度是否都有效的结果  
-      return isValidLat && isValidLng;  
     },
 
     // 根据几何类型绘制

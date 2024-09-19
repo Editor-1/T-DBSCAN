@@ -152,6 +152,11 @@ export function convertDateStringToUnix(dateString) {
     // 返回 Unix 时间戳（毫秒）  
     return date.getTime()/1000
 }  
+/**
+ * 时间戳转换为时间字符串
+ * @param {时间戳} timestamp 
+ * @returns 
+ */
 
 export function convertUnixToDateString(timestamp) {
     const date = new Date(timestamp * 1000); // 将 Unix 时间戳转换为毫秒
@@ -164,3 +169,55 @@ export function convertUnixToDateString(timestamp) {
   
     return `${year}-${month}-${day} ${hours}:${minutes}`;
   } 
+/**
+ * 球面平均中心
+ * @param {坐标点数组} points 
+ * @returns 
+ */
+  export function getCenterPoint(points){
+    var point_num = points.length; //坐标点个数
+    var X = 0, Y = 0, Z = 0;
+    for(let i = 0; i< points.length; i++) {
+      if (points[i] == '') {
+        continue;
+      }
+      let point = points[i];
+      var lat, lng, x, y, z;
+      lat = parseFloat(point.lat) * Math.PI / 180;
+      lng = parseFloat(point.lng) * Math.PI / 180;
+      x = Math.cos(lat) * Math.cos(lng);
+      y = Math.cos(lat) * Math.sin(lng);
+      z = Math.sin(lat);
+      X += x;
+      Y += y;
+      Z += z;
+    }
+    X = X / point_num;
+    Y = Y / point_num;
+    Z = Z / point_num;
+    var tmp_lng = Math.atan2(Y, X);
+    var tmp_lat = Math.atan2(Z, Math.sqrt(X * X + Y * Y));
+    return {lat:tmp_lat * 180 / Math.PI, lng:tmp_lng * 180 / Math.PI};
+}
+
+/**
+ * 判断纬度和经度是否合法
+ * @param {经纬度点} item 
+ * @returns 
+ */
+export function isValidLatLng(item) {  
+    // 检查纬度和经度是否存在且不为null  
+    if (item.lat == null || item.lng == null) {  
+      return false;  
+    }  
+    // 检查纬度和经度是否在有效范围内  
+    // 将字符串转化为浮点数
+    const lat = parseFloat(item.lat)
+    const lng = parseFloat(item.lng)
+    
+    const isValidLat = Number.isFinite(lat) && lat >= -90 &&  lat <= 90;  
+    const isValidLng = Number.isFinite(lng) && lng >= -180 && lng <= 180;  
+    // 返回纬度和经度是否都有效的结果  
+    return isValidLat && isValidLng;  
+  }
+

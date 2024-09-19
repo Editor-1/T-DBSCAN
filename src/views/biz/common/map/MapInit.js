@@ -8,8 +8,8 @@ export function init(el) {
   layerList = getLayerList()
   map = new OnlineMap({
     el: el, //地图容器的元素ID或DOM元素
-    center: [29.087633, 112.618843], //地图中心的经纬度
-    zoom: 9, //地图初始缩放级别
+    center: [40.044324, 116.4550499], //地图中心的经纬度
+    zoom: 5, //地图初始缩放级别
     maxZoom: 18, //地图最大缩放级别
     minZoom: 1, //地图最小缩放级别
     crs: '3857', //坐标参考系，默认为 EPSG3857
