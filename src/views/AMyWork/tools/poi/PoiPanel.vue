@@ -221,7 +221,7 @@ import { clarans } from '../algo/clarans'
 import { dbscan } from '../algo/dbscan' 
 import { optics } from '../algo/optics' 
 import {ElePoint, Region, QuadTreeNode} from '../algo/pubMethods'
-import {convertDateStringToUnix,insertEle,queryEle} from '../algo/pubMethods'
+import {convertDateStringToUnix,insertEle,queryEle,convertUnixToDateString} from '../algo/pubMethods'
 import { tdbscan } from '../algo/tdbscan' 
 import * as PathLayer from '../comm/PathLayer'
 const pointerImg = require('@/assets/images/location64.png')
@@ -231,6 +231,8 @@ const cluCenterPointImg = require('@/assets/images/centerPoint.png')
 let drawNewPoi
 let drawPoi
 let previousLayers = []
+let markersList = []
+let markersCanvas
 export default {
   components: { IconsDialog },
   name: 'PoiPanel',
@@ -351,7 +353,7 @@ export default {
     })
     // 加载数据
     this.loadData()
-    this.greyCrane = this.loadCSV('灰鹤')
+    this.greyCrane = this.loadCSV('灰鹤8.1-11.30轨迹点')
     this.cygne = this.loadCSV('小天鹅')
     this.birdOne = this.loadCSV('鸟类1')
     this.birdTwo = this.loadCSV('鸟类2')
@@ -363,16 +365,21 @@ export default {
   },
   methods: {
     clusave() {
+      if(markersCanvas){
+        markersCanvas.removeMarkers(markersList)
+        markersCanvas.clear()
+        markersList = [];
+      }
       // 清理先前图层
       previousLayers.forEach(layer => {
         map.removeLayer(layer);
       });
       previousLayers = [];
-
       // 添加新的MarkersCanvas
-      const markersCanvas = new L.MarkersCanvas();
+      markersCanvas = new L.MarkersCanvas();
       markersCanvas.addTo(map);
-
+      previousLayers.push(markersCanvas)
+      
       // 定义通用图标
       const icon = L.icon({
         iconUrl: cluPointImg,
@@ -395,6 +402,13 @@ export default {
       } else {
         this.displayWithClustering(temp_bird_data, markersCanvas, iconCenter);
       }
+
+      // 弹窗提示已经聚类结束
+      this.$message({
+        message:'聚类完成',
+        type:'success'
+      })
+
     },
 
     // 根据选择的鸟类返回对应数据
@@ -423,6 +437,7 @@ export default {
             if (this.isValidLatLng(item)) {
               const marker = this.createMarker(item, icon);
               markersCanvas.addMarker(marker);
+              markersList.push(marker);
               latlngs.push([item.lat, item.lng]);
             }
           });
@@ -435,6 +450,7 @@ export default {
           birdArr.forEach(item => {
             if (this.isValidLatLng(item)) {
               const marker = this.createMarker(item, icon);
+              markersList.push(marker);
               markersCanvas.addMarker(marker);
               latlngs.push([item.lat, item.lng]);
             }
@@ -488,27 +504,32 @@ export default {
                     num++
                   }
                 }
-                if(num>=30){
-                  const item = birdArr[p.index]
-                  clusterCenters.push(item)
-                }
+                // if(num>=30){
+                const item = birdArr[p.index]
+                clusterCenters.push(item)
+                // }
             }
             break;
         }
         // 计算停歇时间 做分级渲染
-        clusterCenters = douglasPeucker(clusterCenters,10000)
+        // clusterCenters = douglasPeucker(clusterCenters,5000)
         clusterCenters.forEach(item =>{
           const point  = new ElePoint(item.lat,item.lng,convertDateStringToUnix(item.time),item.index)
           const EpsResults = []
           queryEle(root,point,EpsResults,25000)
           const centerPoint = this.getCenterPoint(EpsResults)
           const times = EpsResults.map(point => convertDateStringToUnix(point.time))
-          const startTime = new Date(Math.min(...times) * 1000).toUTCString()
-          const endTime = new Date(Math.max(...times) * 1000).toUTCString()
+          const startTime = new Date(Math.min(...times))
+          const endTime = new Date(Math.max(...times))
+          const startTimeStr = convertUnixToDateString(startTime)
+          const endTimeStr = convertUnixToDateString(endTime)
+          
           const maxstayTime = (Math.max(...times) - Math.min(...times))/(60*60*24)
           if(this.isValidLatLng(centerPoint)){
-            const marker = this.createCenterMarker({centerPoint,maxstayTime,startTime,endTime}, icon);
+            const marker = this.createCenterMarker({centerPoint,maxstayTime,startTimeStr,endTimeStr}, icon);
             markersCanvas.addMarker(marker);
+            previousLayers.push(marker)
+            markersList.push(marker)
             latlngs.push([centerPoint.lat, centerPoint.lng]);
           }
         })
@@ -545,8 +566,8 @@ export default {
     createCenterMarker(item,icon){
        return L.marker([item.centerPoint.lat, item.centerPoint.lng], { icon })
         .bindPopup(`停留时间:${item.maxstayTime.toFixed(2)}天<p>
-          开始时间:${item.startTime}<p>
-          结束时间:${item.endTime}<p>
+          开始时间:${item.startTimeStr}<p>
+          结束时间:${item.endTimeStr}<p>
           经度:${parseFloat(item.centerPoint.lng).toFixed(5)}<p>纬度:${parseFloat(item.centerPoint.lat).toFixed(5)}`)
         .on({
           mouseover(e) { this.openPopup(); },
@@ -582,9 +603,7 @@ export default {
 
     // 根据几何类型绘制
     handleGeometricType(latlngs, markersCanvas) {
-      if (this.geometricType == '1') {
-        previousLayers = previousLayers.concat(latlngs);
-      } else {
+      if (this.geometricType != '1') {
         const polyline = L.polyline(latlngs, { color: 'red', weight: 3 }).addTo(map);
         const decorator = L.polylineDecorator(polyline, {
           patterns: [
@@ -610,23 +629,25 @@ export default {
         const results = Papa.parse(csv, {  
           header: true,  
           transform: function(value, field) {  
-            // 根据列名（field）来决定如何转换值  
             if (field === 'lng' || field === 'lat') {  
-              // 尝试将值转换为浮点数，如果失败则返回原始值（或你可以决定如何处理错误）  
               const num = parseFloat(value);  
               return isNaN(num) ? value : num;  
             }  
-            // 对于time列，我们保持其原始字符串形式  
             return value;  
           }  
         });   
-        // 如果需要，可以在这里将解析后的数据赋值给某个属性，或者直接返回  
-        // this.cludata = results.data; // 假设cludata是你的组件的一个数据属性  
-        return results.data;  
+        
+        // 按照第一列时间字符串排序
+        const sortedData = results.data.sort((a, b) => {
+          const timeA = convertDateStringToUnix(a[Object.keys(a)[0]]); // 第一列的时间值
+          const timeB = convertDateStringToUnix(b[Object.keys(b)[0]]);
+          return timeA - timeB; // 升序排列
+        });
+        
+        return sortedData;    
       } catch (error) {    
         console.error('Error loading CSV:', error);    
-        // 可以在这里处理错误，比如通过抛出一个错误或显示一个错误消息给用户  
-        throw error; // 你可以选择重新抛出错误，以便在调用者中捕获和处理  
+        throw error; 
       }    
     },
     //根据地名查找经纬度
