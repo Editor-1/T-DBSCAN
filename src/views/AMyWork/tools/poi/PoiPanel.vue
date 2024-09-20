@@ -168,8 +168,11 @@
                 :value="item.label">
               </el-option>
             </el-select>
+          </el-form-item>
+          <el-form-item label="最小停留天数" v-if="clusterStyle==5">
+            <el-input v-model="minstayTime" placeholder="3.0"></el-input>
           </el-form-item> 
-          <el-form-item label="最大停留时长" v-if="clusterStyle==5">
+          <el-form-item label="最大停留天数" v-if="clusterStyle==5">
             <el-input v-model="maxstayTime" placeholder="130.0"></el-input>
           </el-form-item>
           <el-form-item label="模式">
@@ -256,6 +259,8 @@ export default {
       clusterStyle:'',
       //最大停留时长
       maxstayTime:'',
+      //最短停留时长
+      minstayTime:'',
       //聚合方式
       clusterStyleOptions:[{
         value:1,
@@ -491,13 +496,16 @@ export default {
             if(this.maxstayTime == ''){
               this.maxstayTime = 130
             }
+            if(this.minstayTime == ''){
+              this.minstayTime = 3
+            }
             const gpsPoints = []
             birdArr.forEach(item=>{
               const temp = new ElePoint(parseFloat(item.lat), parseFloat(item.lng), convertDateStringToUnix(item.time), gpsPoints.length);
               gpsPoints.push(temp);
             })
             
-            const {clusters,CorePoints} = tdbscan(gpsPoints,25000,60 * 60 * 24 * 3,60 * 60 * 24 * this.maxstayTime)
+            const {clusters,CorePoints} = tdbscan(gpsPoints,25000,60 * 60 * 24 * this.minstayTime,60 * 60 * 24 * this.maxstayTime)
             for(const p of CorePoints){
                 var num = 0
                 for(const v of clusters){
