@@ -50,9 +50,10 @@ export function douglasPeucker(coordinates, dMax) {
     let coordinate = coordinates.map((item, index) => ({
         lat: item.lat,
         lng: item.lng,
-        time: item.time,
+        ...(item.time ? { time: item.time } : {}), // 仅当 item.time 存在时才添加 time 属性
         key: index
     }));
+    
 
     let result = compressLine(coordinate, [], 0, coordinate.length - 1, dMax);
     result.push(coordinate[0]);

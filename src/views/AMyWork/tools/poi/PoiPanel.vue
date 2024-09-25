@@ -172,8 +172,8 @@
           <el-form-item label="最小停留天数" v-if="clusterStyle==5">
             <el-input v-model="minstayTime" placeholder="3.0"></el-input>
           </el-form-item> 
-          <el-form-item label="最大停留天数" v-if="clusterStyle==5">
-            <el-input v-model="maxstayTime" placeholder="130.0"></el-input>
+          <el-form-item label="两个点最大间隔天数" v-if="clusterStyle==5">
+            <el-input v-model="maxstayTime" placeholder="3.0"></el-input>
           </el-form-item>
           <el-form-item label="模式">
             <el-radio-group v-model="pattern">
@@ -231,7 +231,6 @@ import * as PathLayer from '../comm/PathLayer'
 const pointerImg = require('@/assets/images/location64.png')
 const cluPointImg = require('@/assets/images/point.png')
 const cluCenterPointImg = require('@/assets/images/centerPoint.png')
-// 定义 drawPoi 变量
 let drawNewPoi
 let drawPoi
 let previousLayers = []
@@ -494,7 +493,7 @@ export default {
             break;
           case 5:
             if(this.maxstayTime == ''){
-              this.maxstayTime = 130
+              this.maxstayTime = 3
             }
             if(this.minstayTime == ''){
               this.minstayTime = 3
@@ -505,42 +504,67 @@ export default {
               gpsPoints.push(temp);
             })
             
-            const {clusters,CorePoints} = tdbscan(gpsPoints,25000,60 * 60 * 24 * this.minstayTime,60 * 60 * 24 * this.maxstayTime)
+            const {clusters,CorePoints} = tdbscan(gpsPoints,25000, this.minstayTime, this.maxstayTime)
             for(const p of CorePoints){
-                var num = 0
-                for(const v of clusters){
-                  if(clusters[p.index]===v){
-                    num++
+                var maxstayTime = 0
+                const point = birdArr[p.index]
+                const startTime = point.time
+                var endTime = point.time
+                const timeP = convertDateStringToUnix(point.time)
+                for(let i = 0;i<clusters.length;i++){
+                  if(clusters[p.index] == clusters[i]){
+                    const timeQ = convertDateStringToUnix(birdArr[i].time)
+                    const disTime = Math.abs(timeP - timeQ)/(60*60*24)
+                    if(disTime>=maxstayTime){
+                      maxstayTime = disTime
+                      endTime = birdArr[i].time
+                    }
                   }
                 }
-                // if(num>=30){
-                const item = birdArr[p.index]
-                clusterCenters.push(item)
-                // }
+                clusterCenters.push({maxstayTime:maxstayTime,startTimeStr:startTime,
+                  endTimeStr:endTime,centerPoint:point
+                })
             }
             break;
         }
-        // 计算停歇时间 做分级渲染
-        // clusterCenters = douglasPeucker(clusterCenters,5000)
-        clusterCenters.forEach(item =>{
-          const point  = new ElePoint(item.lat,item.lng,convertDateStringToUnix(item.time),item.index)
-          const EpsResults = []
-          queryEle(root,point,EpsResults,25000)
-          const centerPoint = getCenterPoint(EpsResults)
-          const times = EpsResults.map(point => convertDateStringToUnix(point.time))
-          const startTime = new Date(Math.min(...times))
-          const endTime = new Date(Math.max(...times))
-          const startTimeStr = convertUnixToDateString(startTime)
-          const endTimeStr = convertUnixToDateString(endTime)
-          const maxstayTime = (Math.max(...times) - Math.min(...times))/(60*60*24)
-          if(isValidLatLng(centerPoint)){
+        // if(clusterCenters.length>=15){
+        //   clusterCenters = douglasPeucker(clusterCenters,5000)
+        // }
+        console.log(clusterCenters)
+        if(this.clusterStyle == 5){
+          clusterCenters.forEach(item =>{
+            const centerPoint = item.centerPoint
+            const maxstayTime = item.maxstayTime
+            const startTimeStr = item.startTimeStr
+            const endTimeStr = item.endTimeStr
             const marker = this.createCenterMarker({centerPoint,maxstayTime,startTimeStr,endTimeStr}, icon);
             markersCanvas.addMarker(marker);
             previousLayers.push(marker)
             markersList.push(marker)
             latlngs.push([centerPoint.lat, centerPoint.lng]);
-          }
-        })
+          })
+        }else{
+          // 计算停歇时间 做分级渲染
+          clusterCenters.forEach(item =>{
+            const point  = new ElePoint(item.lat,item.lng,convertDateStringToUnix(item.time),item.index)
+            const EpsResults = []
+            queryEle(root,point,EpsResults,25000)
+            const centerPoint = getCenterPoint(EpsResults)
+            const times = EpsResults.map(point => convertDateStringToUnix(point.time))
+            const startTime = new Date(Math.min(...times))
+            const endTime = new Date(Math.max(...times))
+            const startTimeStr = convertUnixToDateString(startTime)
+            const endTimeStr = convertUnixToDateString(endTime)
+            const maxstayTime = (Math.max(...times) - Math.min(...times))/(60*60*24)
+            if(isValidLatLng(centerPoint)){
+              const marker = this.createCenterMarker({centerPoint,maxstayTime,startTimeStr,endTimeStr}, icon);
+              markersCanvas.addMarker(marker);
+              previousLayers.push(marker)
+              markersList.push(marker)
+              latlngs.push([centerPoint.lat, centerPoint.lng]);
+            }
+          })
+        }
         this.handleGeometricType(latlngs, markersCanvas);
       });
     },

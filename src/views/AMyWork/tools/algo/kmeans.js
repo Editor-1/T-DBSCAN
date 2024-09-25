@@ -65,6 +65,5 @@ export function kMeans(data, k) {
         centroids = newCentroids;
         iterations++;
     }
-    console.log(centroids)
     return centroids;
 }
