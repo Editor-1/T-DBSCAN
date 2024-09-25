@@ -1,4 +1,4 @@
-import {calculateDistance,convertDateStringToUnix} from './pubMethods'
+import {calculateDistance,convertDateStringToUnix,getCenterPoint} from './pubMethods'
 export function kMeans(data, k) {
     // 随机初始化中心点的辅助函数
     function initializeCentroids(data, k) {
@@ -18,6 +18,7 @@ export function kMeans(data, k) {
     // 将点分配到最近中心点的辅助函数
     function assignPointsToCentroids(data, centroids) {
         const clusters = Array.from({ length: centroids.length }, () => []);
+
         data.forEach(point => {
             let minDist = Infinity;
             let closestCentroid = -1;
@@ -42,24 +43,32 @@ export function kMeans(data, k) {
     function updateCentroids(clusters) {
         return clusters.map(cluster => {
             if (cluster.length === 0) return null;
-            const sumLat = cluster.reduce((sum, point) => sum + parseFloat(point.lat), 0);
-            const sumLng = cluster.reduce((sum, point) => sum + parseFloat(point.lng), 0);
+
+            // const sumLat = cluster.reduce((sum, point) => sum + parseFloat(point.lat), 0);
+            // const sumLng = cluster.reduce((sum, point) => sum + parseFloat(point.lng), 0);
+            const centerPoint = getCenterPoint(cluster);
+    
+            console.log(centerPoint);
             const times = cluster.map(point => convertDateStringToUnix(point.time));  
             const minTime = Math.min(...times)*1000;
             const date = new Date(minTime)
             const dateStr = date.toISOString()
-            return { lat: sumLat / cluster.length, lng: sumLng / cluster.length, time: dateStr};
+
+            return { lat: centerPoint.lat, lng: centerPoint.lng, time: dateStr};
         }).filter(centroid => centroid !== null);
     }
 
     // K-means 主函数
+    // 随机生成 k 个中心点
     let centroids = initializeCentroids(data, k);
     let clusters = [];
     let iterations = 0;
     const maxIterations = 100; // 设置最大迭代次数防止无限循环
 
     while (iterations < maxIterations) {
+
         clusters = assignPointsToCentroids(data, centroids);
+        //生成多个新的中心点
         const newCentroids = updateCentroids(clusters);
         if (JSON.stringify(newCentroids) === JSON.stringify(centroids)) break;
         centroids = newCentroids;
