@@ -55,6 +55,6 @@ export function dbscan(data, eps, minPts) {
             C[p] = -1;
         }
     }
-
+    console.log(C)
     return corePoints;
 }

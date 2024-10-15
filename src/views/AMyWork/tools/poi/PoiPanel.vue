@@ -359,6 +359,7 @@ export default {
     // 加载数据
     this.loadData()
     this.greyCrane = this.loadCSV('灰鹤8.1-11.30轨迹点')
+    // this.greyCrane = this.loadCSV('灰鹤8.1-11.30轨迹点')
     this.cygne = this.loadCSV('小天鹅')
     this.birdOne = this.loadCSV('鸟类1')
     this.birdTwo = this.loadCSV('鸟类2')
@@ -489,7 +490,7 @@ export default {
             clusterCenters = dbscan(points, 25, 70);
             break;
           case 4:
-            clusterCenters =  optics(points,25,70);
+            clusterCenters =  optics(points,6,20);
             break;
           case 5:
             if(this.maxstayTime == ''){
@@ -505,6 +506,7 @@ export default {
             })
             
             const {clusters,CorePoints} = tdbscan(gpsPoints,25000, this.minstayTime, this.maxstayTime)
+            console.log(clusters)
             for(const p of CorePoints){
                 var maxstayTime = 0
                 const point = birdArr[p.index]
@@ -530,8 +532,7 @@ export default {
         // if(clusterCenters.length>=15){
         //   clusterCenters = douglasPeucker(clusterCenters,5000)
         // }
-        console.log(clusterCenters)
-        if(this.clusterStyle == 5){
+        if(this.clusterStyle == 5 || this.clusterStyle == 4){
           clusterCenters.forEach(item =>{
             const centerPoint = item.centerPoint
             const maxstayTime = item.maxstayTime

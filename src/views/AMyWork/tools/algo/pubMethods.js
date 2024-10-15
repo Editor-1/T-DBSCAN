@@ -16,7 +16,7 @@ export  function calculateDistance(point1, point2) {
     const b = (lng1 * Math.PI / 180.0) - (lng2 * Math.PI / 180.0);
     const s = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin(a / 2), 2) +
         Math.cos(radLat1) * Math.cos(radLat2) * Math.pow(Math.sin(b / 2), 2)));
-    return s * 6370996.81;
+    return s * 6371000.00;
 }
 
 /**
