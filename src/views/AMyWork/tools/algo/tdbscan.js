@@ -35,7 +35,7 @@ function cross(o, a, b) {
 }
 
 export function tdbscan(points, eps, minTime, maxTime) {
-    
+    console.log(points)
     // 一些初始化工作、建立四叉树索引，访问数组全部置为false、聚类簇设置为-1
     const rootRegion = new Region(-90, 90, -180, 180)
     const root = new QuadTreeNode(1, rootRegion)
@@ -173,6 +173,7 @@ export function tdbscan(points, eps, minTime, maxTime) {
             clusters[p.index] = -1;
         }
     }
+    console.log(CorePoints)
     return { clusters, CorePoints };
 }
   

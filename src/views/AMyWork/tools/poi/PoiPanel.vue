@@ -250,6 +250,12 @@ export default {
       birdOne:[],
       // 鸟类2
       birdTwo:[],
+      // 蓑羽鹤
+      demoiselleCrane:[],
+      //东方白鹤
+      OrientalWhiteCrane:[],
+      //中杓鹬
+      NumeniusPhaeopus:[],
       // 数据模式
       pattern:2,
       // 几何类型
@@ -290,6 +296,15 @@ export default {
       },{
         value:3,
         label:'鸟类2'
+      },{
+        value:4,
+        label:'蓑羽鹤'
+      },{
+        value:5,
+        label:'东方白鹤'
+      },{
+        value:6,
+        label:'中杓鹬'
       }],
       showpoint: '0',
       dataList: [], // 数据列表
@@ -363,6 +378,9 @@ export default {
     this.cygne = this.loadCSV('小天鹅')
     this.birdOne = this.loadCSV('鸟类1')
     this.birdTwo = this.loadCSV('鸟类2')
+    this.demoiselleCrane = this.loadCSV('蓑羽鹤')
+    this.OrientalWhiteCrane = this.loadCSV('东方白鹤')
+    this.NumeniusPhaeopus = this.loadCSV('中杓鹬')
   },
   beforeDestroy() {
     // 清除绘制
@@ -428,6 +446,12 @@ export default {
           return this.birdOne;
         case '鸟类2':
           return this.birdTwo;
+        case '蓑羽鹤':
+          return this.demoiselleCrane
+        case '东方白鹤':
+          return this.OrientalWhiteCrane
+        case '中杓鹬':
+          return this.NumeniusPhaeopus  
         default:
           return [];
       }
